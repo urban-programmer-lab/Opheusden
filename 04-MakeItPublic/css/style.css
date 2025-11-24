@@ -1,0 +1,91 @@
+html,
+body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+#app {
+    display: flex;
+    height: 100%;
+}
+
+/* Sidebar */
+
+#sidebar {
+    width: 320px;
+    padding: 12px 14px;
+    box-sizing: border-box;
+    border-right: 1px solid #ddd;
+    overflow-y: auto;
+    background: #fafafa;
+}
+
+#sidebar h2 {
+    margin: 0 0 6px;
+    font-size: 18px;
+}
+
+#sidebar p {
+    margin: 6px 0 10px;
+    font-size: 13px;
+}
+
+.info-box {
+    background: #fff;
+    border-radius: 6px;
+    border: 1px solid #e0e0e0;
+    padding: 8px 10px;
+    font-size: 12px;
+}
+
+.info-box h3 {
+    margin: 0 0 4px;
+    font-size: 13px;
+}
+
+.info-box ul {
+    padding-left: 18px;
+    margin: 4px 0 4px;
+}
+
+.info-box li {
+    margin-bottom: 2px;
+}
+
+.info-box .small {
+    font-size: 11px;
+    color: #666;
+}
+
+/* Criteria groups */
+
+#criteria-controls {
+    margin-bottom: 10px;
+}
+
+.criteria-group {
+    margin-bottom: 10px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 6px;
+}
+
+.criteria-group h3 {
+    margin: 6px 0;
+    font-size: 14px;
+}
+
+.criteria-layer {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    margin-bottom: 2px;
+}
+
+/* Map */
+
+#map {
+    flex: 1;
+}
