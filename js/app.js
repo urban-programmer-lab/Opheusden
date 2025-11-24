@@ -31,7 +31,90 @@ const baseLayers = {
     "Topographic Map": topoBase
 };
 
-// ----- 2. Criteria layers configuration -----
+// ----- 2. Custom Legend Definitions -----
+
+const customLegends = {
+    "flood_riskzone": {
+        items: [
+            { color: "#0066CC", label: "High flood risk area" },
+            { color: "#3399FF", label: "Medium flood risk area" },
+            { color: "#99CCFF", label: "Low flood risk area" }
+        ]
+    },
+    "soil_bro_bodemkaart": {
+        items: [
+            { color: "#8B4513", label: "Clay soils" },
+            { color: "#DEB887", label: "Sandy soils" },
+            { color: "#F4A460", label: "Peat soils" },
+            { color: "#D2691E", label: "Loamy soils" },
+            { color: "#CD853F", label: "Mixed soils" }
+        ]
+    },
+    "natura2000": {
+        items: [
+            { color: "#228B22", label: "Natura 2000 protected area" },
+            { color: "#90EE90", label: "Buffer zone" }
+        ]
+    },
+    "heritage_cultuurhistorie": {
+        items: [
+            { color: "#8B008B", label: "Protected monument" },
+            { color: "#BA55D3", label: "Protected cityscape" },
+            { color: "#DA70D6", label: "Archaeological site" }
+        ]
+    },
+    "roads_top10nl": {
+        items: [
+            { color: "#FF0000", label: "Highway" },
+            { color: "#FFA500", label: "Main road" },
+            { color: "#FFD700", label: "Regional road" },
+            { color: "#FFFF00", label: "Local road" }
+        ]
+    },
+    "railways": {
+        items: [
+            { color: "#000000", label: "Railway line" },
+            { color: "#666666", label: "Tram line" }
+        ]
+    },
+    "bbg_landuse": {
+        items: [
+            { color: "#FF0000", label: "Residential area" },
+            { color: "#800080", label: "Industrial/commercial" },
+            { color: "#00FF00", label: "Agriculture" },
+            { color: "#006400", label: "Forest" },
+            { color: "#0000FF", label: "Water" },
+            { color: "#FFFF00", label: "Recreation" },
+            { color: "#808080", label: "Infrastructure" }
+        ]
+    },
+    "top10nl_terrain": {
+        items: [
+            { color: "#90EE90", label: "Grassland" },
+            { color: "#228B22", label: "Forest/woodland" },
+            { color: "#8B4513", label: "Agricultural land" },
+            { color: "#87CEEB", label: "Water bodies" },
+            { color: "#D3D3D3", label: "Built-up area" }
+        ]
+    },
+    "brk_percelen": {
+        items: [
+            { color: "#FF69B4", label: "Cadastral parcel boundary" }
+        ]
+    },
+    "brk_borders": {
+        items: [
+            { color: "#FF1493", label: "Cadastral border" }
+        ]
+    },
+    "bag_panden": {
+        items: [
+            { color: "#A0522D", label: "Building footprint" }
+        ]
+    }
+};
+
+// ----- 3. Criteria layers configuration -----
 //
 // Each entry corresponds to one "criterion" from your email:
 // - Flood risk (ROR RiskZone)
@@ -239,6 +322,7 @@ const criteriaLayers = {
 // ----- 3. Internal storage for Leaflet layers -----
 
 const leafletLayers = {};
+const activeLayers = new Map(); // Track active layers with their definitions
 
 // Create a Leaflet layer object from our config
 function createLeafletLayer(layerDef) {
@@ -249,6 +333,91 @@ function createLeafletLayer(layerDef) {
     // Extend here later for WFS → GeoJSON, vector tiles, etc.
     console.warn("Unsupported layer type:", layerDef.type);
     return null;
+}
+
+// Get legend URL for WMS layer
+function getLegendUrl(layerDef) {
+    if (layerDef.type !== "wms") return null;
+
+    const baseUrl = layerDef.url.split('?')[0];
+    const params = new URLSearchParams({
+        SERVICE: 'WMS',
+        VERSION: layerDef.options.version || '1.3.0',
+        REQUEST: 'GetLegendGraphic',
+        FORMAT: 'image/png',
+        LAYER: layerDef.options.layers,
+        STYLE: layerDef.options.styles || ''
+    });
+
+    return `${baseUrl}?${params.toString()}`;
+}
+
+// Update the legend display
+function updateLegend() {
+    const legendDiv = document.getElementById('legend');
+    const legendContent = document.getElementById('legend-content');
+
+    if (activeLayers.size === 0) {
+        legendDiv.classList.add('hidden');
+        return;
+    }
+
+    legendDiv.classList.remove('hidden');
+    legendContent.innerHTML = '';
+
+    activeLayers.forEach((layerDef, layerId) => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'legend-item';
+
+        const title = document.createElement('div');
+        title.className = 'legend-item-title';
+        title.textContent = layerDef.label;
+        itemDiv.appendChild(title);
+
+        // Check if we have a custom legend for this layer
+        const customLegend = customLegends[layerId];
+
+        if (customLegend && customLegend.items) {
+            // Create custom legend with color swatches
+            const legendTable = document.createElement('div');
+            legendTable.style.fontSize = '11px';
+            legendTable.style.marginTop = '4px';
+
+            customLegend.items.forEach(item => {
+                const row = document.createElement('div');
+                row.style.display = 'flex';
+                row.style.alignItems = 'center';
+                row.style.marginBottom = '3px';
+
+                const colorBox = document.createElement('div');
+                colorBox.style.width = '20px';
+                colorBox.style.height = '12px';
+                colorBox.style.backgroundColor = item.color;
+                colorBox.style.border = '1px solid #999';
+                colorBox.style.marginRight = '6px';
+                colorBox.style.flexShrink = '0';
+
+                const labelSpan = document.createElement('span');
+                labelSpan.textContent = item.label;
+
+                row.appendChild(colorBox);
+                row.appendChild(labelSpan);
+                legendTable.appendChild(row);
+            });
+
+            itemDiv.appendChild(legendTable);
+        } else {
+            // Fallback: generic layer indicator
+            const genericMsg = document.createElement('div');
+            genericMsg.style.fontSize = '11px';
+            genericMsg.style.color = '#666';
+            genericMsg.style.marginTop = '4px';
+            genericMsg.textContent = 'Layer active on map';
+            itemDiv.appendChild(genericMsg);
+        }
+
+        legendContent.appendChild(itemDiv);
+    });
 }
 
 // ----- 4. Build the sidebar UI (criteria + checkboxes) -----
@@ -289,9 +458,13 @@ function initCriteriaControls() {
 
                 if (e.target.checked) {
                     layer.addTo(map);
+                    activeLayers.set(id, layerDef);
                 } else {
                     map.removeLayer(layer);
+                    activeLayers.delete(id);
                 }
+
+                updateLegend();
             });
 
             const text = document.createElement("span");
