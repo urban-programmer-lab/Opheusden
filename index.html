@@ -31,12 +31,13 @@
                     <li><strong>Ecology</strong> – Natura 2000 areas</li>
                     <li><strong>Cultural heritage</strong> – Rijksmonumenten & protected sites</li>
                     <li><strong>Transport</strong> – Roads & railways (TOP10NL)</li>
-                    <li><strong>Land use</strong> – Bestand Bodemgebruik (CBS)</li>
+                    <li><strong>Land use</strong> – Bestand Bodemgebruik (CBS) & LGN</li>
                     <li><strong>Cadastral</strong> – Parcels & boundaries (BRK)</li>
-                    <li><strong>Buildings</strong> – BAG Panden</li>
+                    <li><strong>Buildings</strong> – BAG Panden (incl. usage & build year)</li>
+                    <li><strong>Elevation</strong> – AHN Digital Surface Model (DSM 0.5m)</li>
                 </ul>
                 <p class="small">
-                    Data via PDOK, Rijkswaterstaat, CBS & Kadaster. Use for regional / quick-scan level,
+                    Data via PDOK, Rijkswaterstaat, CBS, WUR & Kadaster. Use for regional / quick-scan level,
                     not parcel-level decisions.
                 </p>
             </div>
@@ -53,6 +54,12 @@
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
         integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <!-- JSZip for handling KMZ files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <!-- toGeoJSON for KML to GeoJSON conversion -->
+    <script src="https://unpkg.com/@mapbox/togeojson@0.16.0/togeojson.js"></script>
 
     <script src="js/app.js"></script>
 </body>

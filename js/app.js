@@ -1,6 +1,6 @@
 // ----- 1. Base map setup -----
 
-// Center on Opheusden (approximate)
+// Initialize map with temporary view (will be adjusted when KMZ loads)
 const map = L.map('map').setView([51.933, 5.633], 12);
 
 // Base layer: OpenStreetMap
@@ -110,6 +110,44 @@ const customLegends = {
     "bag_panden": {
         items: [
             { color: "#A0522D", label: "Building footprint" }
+        ]
+    },
+    "bag_gebruiksdoel": {
+        items: [
+            { color: "#FF6B6B", label: "Residential" },
+            { color: "#4ECDC4", label: "Commercial" },
+            { color: "#45B7D1", label: "Industrial" },
+            { color: "#96CEB4", label: "Mixed use" },
+            { color: "#FFEAA7", label: "Other" }
+        ]
+    },
+    "bag_bouwjaar": {
+        items: [
+            { color: "#8B0000", label: "Before 1900" },
+            { color: "#CD5C5C", label: "1900-1945" },
+            { color: "#FFA07A", label: "1945-1970" },
+            { color: "#FFD700", label: "1970-1990" },
+            { color: "#9ACD32", label: "1990-2010" },
+            { color: "#32CD32", label: "After 2010" }
+        ]
+    },
+    "ahn_dsm": {
+        items: [
+            { color: "#0D47A1", label: "Low elevation" },
+            { color: "#1976D2", label: "Medium-low" },
+            { color: "#42A5F5", label: "Medium" },
+            { color: "#90CAF9", label: "Medium-high" },
+            { color: "#E3F2FD", label: "High elevation" }
+        ]
+    },
+    "lgn_landgebruik": {
+        items: [
+            { color: "#FFD700", label: "Arable land" },
+            { color: "#90EE90", label: "Grassland" },
+            { color: "#228B22", label: "Forest" },
+            { color: "#0000FF", label: "Water" },
+            { color: "#FF0000", label: "Built-up area" },
+            { color: "#D3D3D3", label: "Other" }
         ]
     }
 };
@@ -314,6 +352,70 @@ const criteriaLayers = {
                     version: "1.3.0",
                     attribution: "Kadaster / PDOK – BAG"
                 }
+            },
+            {
+                id: "bag_gebruiksdoel",
+                label: "Building usage (Gebruiksdoel)",
+                type: "wms",
+                url: "https://service.pdok.nl/lv/bag/wms/v2_0",
+                options: {
+                    layers: "gebruiksdoel",
+                    format: "image/png",
+                    transparent: true,
+                    version: "1.3.0",
+                    attribution: "Kadaster / PDOK – BAG Gebruiksdoel"
+                }
+            },
+            {
+                id: "bag_bouwjaar",
+                label: "Building year (Bouwjaar)",
+                type: "wms",
+                url: "https://service.pdok.nl/lv/bag/wms/v2_0",
+                options: {
+                    layers: "bouwjaar",
+                    format: "image/png",
+                    transparent: true,
+                    version: "1.3.0",
+                    attribution: "Kadaster / PDOK – BAG Bouwjaar"
+                }
+            }
+        ]
+    },
+
+    elevation: {
+        label: "Elevation & Terrain Model (AHN)",
+        layers: [
+            {
+                id: "ahn_dsm",
+                label: "Digital Surface Model (DSM) 0.5m",
+                type: "wms",
+                url: "https://service.pdok.nl/rws/ahn/wms/v1_0",
+                options: {
+                    layers: "dsm_05m",
+                    format: "image/png",
+                    transparent: true,
+                    version: "1.3.0",
+                    attribution: "RWS / PDOK – AHN Digital Surface Model"
+                }
+            }
+        ]
+    },
+
+    landgebruik: {
+        label: "Land Use (LGN)",
+        layers: [
+            {
+                id: "lgn_landgebruik",
+                label: "Landelijk Grondgebruik Nederland (LGN)",
+                type: "wms",
+                url: "https://service.pdok.nl/wur/landelijk-grondgebruik-nederland/wms/v1_0",
+                options: {
+                    layers: "lgn",
+                    format: "image/png",
+                    transparent: true,
+                    version: "1.3.0",
+                    attribution: "WUR / PDOK – Landelijk Grondgebruik Nederland"
+                }
             }
         ]
     }
@@ -487,3 +589,147 @@ initCriteriaControls();
 // For now, we just show base layers in the standard layer control.
 // You can extend this later if you want all overlays listed there.
 L.control.layers(baseLayers, null, { collapsed: true }).addTo(map);
+
+// ----- 6. Load KMZ file (My Places) -----
+
+// Function to load and parse KMZ file
+async function loadKMZ(url) {
+    try {
+        console.log('Loading KMZ file from:', url);
+
+        // Fetch the KMZ file
+        const response = await fetch(url);
+        const arrayBuffer = await response.arrayBuffer();
+
+        // Unzip the KMZ file using JSZip
+        const zip = await JSZip.loadAsync(arrayBuffer);
+
+        // Find the KML file inside (usually doc.kml or the first .kml file)
+        let kmlFile = zip.file('doc.kml');
+        if (!kmlFile) {
+            // Look for any .kml file
+            const kmlFiles = Object.keys(zip.files).filter(name => name.endsWith('.kml'));
+            if (kmlFiles.length > 0) {
+                kmlFile = zip.file(kmlFiles[0]);
+            }
+        }
+
+        if (!kmlFile) {
+            throw new Error('No KML file found in KMZ archive');
+        }
+
+        // Extract the KML content
+        const kmlText = await kmlFile.async('string');
+
+        // Parse KML to DOM
+        const parser = new DOMParser();
+        const kmlDom = parser.parseFromString(kmlText, 'text/xml');
+
+        // Convert KML to GeoJSON using toGeoJSON
+        const geojson = toGeoJSON.kml(kmlDom);
+
+        console.log('KMZ parsed successfully, features found:', geojson.features.length);
+        console.log('GeoJSON:', geojson);
+
+        // Filter features to only include those in Opheusden area (Netherlands)
+        // Approximate bounding box: lat 51.5-52.5, lon 5.0-6.5
+        const filteredFeatures = geojson.features.filter(feature => {
+            if (feature.geometry.type === 'Point') {
+                const [lon, lat] = feature.geometry.coordinates;
+                return lat >= 51.5 && lat <= 52.5 && lon >= 5.0 && lon <= 6.5;
+            } else if (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon') {
+                // For polygons, check if any coordinate is in the area
+                const coords = feature.geometry.type === 'Polygon'
+                    ? feature.geometry.coordinates[0]
+                    : feature.geometry.coordinates[0][0];
+                const firstCoord = coords[0];
+                const [lon, lat] = firstCoord;
+                return lat >= 51.5 && lat <= 52.5 && lon >= 5.0 && lon <= 6.5;
+            }
+            return true;
+        });
+
+        console.log('Filtered features (Opheusden area):', filteredFeatures.length);
+
+        // Create filtered GeoJSON
+        const filteredGeoJSON = {
+            type: 'FeatureCollection',
+            features: filteredFeatures
+        };
+
+        // Create a Leaflet GeoJSON layer
+        const kmzLayer = L.geoJSON(filteredGeoJSON, {
+            style: function (feature) {
+                // Style for polygons and lines - soft border, no fill
+                return {
+                    color: '#b81c0bff',
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0,
+                    smoothFactor: 1.5,
+                    lineCap: 'round',
+                    lineJoin: 'round'
+                };
+            },
+            pointToLayer: function (feature, latlng) {
+                // Style for points
+                return L.marker(latlng);
+            },
+            onEachFeature: function (feature, layer) {
+                // Add popup with properties
+                if (feature.properties) {
+                    let popupContent = '';
+                    if (feature.properties.name) {
+                        popupContent += '<strong>' + feature.properties.name + '</strong>';
+                    }
+                    if (feature.properties.description) {
+                        popupContent += '<br>' + feature.properties.description;
+                    }
+                    if (popupContent) {
+                        layer.bindPopup(popupContent);
+                    }
+
+                    // Add permanent label with the number from name or description
+                    if (layer.getBounds && feature.geometry.type.includes('Polygon')) {
+                        // Extract number from name or description
+                        let labelText = '';
+                        if (feature.properties.name) {
+                            // Try to extract number from name
+                            const match = feature.properties.name.match(/\d+/);
+                            labelText = match ? match[0] : feature.properties.name;
+                        }
+
+                        // Create permanent label at polygon center with circular background
+                        const center = layer.getBounds().getCenter();
+                        L.marker(center, {
+                            icon: L.divIcon({
+                                className: 'polygon-label',
+                                html: '<div style="background: white; border: 2px solid #e35f13ff; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #e35f13ff; font-size: 14px;">' + labelText + '</div>',
+                                iconSize: [30, 30],
+                                iconAnchor: [15, 15]
+                            })
+                        }).addTo(map);
+                    }
+                }
+            }
+        }).addTo(map);
+
+        // Fit map to KMZ bounds with padding
+        if (kmzLayer.getBounds().isValid()) {
+            map.fitBounds(kmzLayer.getBounds(), { padding: [50, 50] });
+            console.log('Map fitted to KMZ bounds');
+        } else {
+            // Fallback to Opheusden if bounds invalid
+            map.setView([51.933, 5.633], 12);
+        }
+
+        return kmzLayer;
+
+    } catch (error) {
+        console.error('Error loading KMZ file:', error);
+        alert('Failed to load KMZ file: ' + error.message);
+    }
+}
+
+// Load the My Places KMZ file
+loadKMZ('data/My Places.kmz');
