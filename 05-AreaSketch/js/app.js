@@ -374,46 +374,94 @@ function updateLegend() {
         title.textContent = layerDef.label;
         itemDiv.appendChild(title);
 
-        // Check if we have a custom legend for this layer
-        const customLegend = customLegends[layerId];
-
-        if (customLegend && customLegend.items) {
-            // Create custom legend with color swatches
-            const legendTable = document.createElement('div');
-            legendTable.style.fontSize = '11px';
-            legendTable.style.marginTop = '4px';
-
-            customLegend.items.forEach(item => {
-                const row = document.createElement('div');
-                row.style.display = 'flex';
-                row.style.alignItems = 'center';
-                row.style.marginBottom = '3px';
-
-                const colorBox = document.createElement('div');
-                colorBox.style.width = '20px';
-                colorBox.style.height = '12px';
-                colorBox.style.backgroundColor = item.color;
-                colorBox.style.border = '1px solid #999';
-                colorBox.style.marginRight = '6px';
-                colorBox.style.flexShrink = '0';
-
-                const labelSpan = document.createElement('span');
-                labelSpan.textContent = item.label;
-
-                row.appendChild(colorBox);
-                row.appendChild(labelSpan);
-                legendTable.appendChild(row);
-            });
-
-            itemDiv.appendChild(legendTable);
+        // Try to get WMS legend graphic first
+        if (layerDef.type === "wms") {
+            const baseUrl = layerDef.url.split('?')[0];
+            
+            // Try multiple WMS versions and request types
+            const legendUrls = [
+                // Standard GetLegendGraphic request
+                `${baseUrl}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetLegendGraphic&FORMAT=image/png&LAYER=${layerDef.options.layers}`,
+                // With SLD
+                `${baseUrl}?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetLegendGraphic&FORMAT=image/png&LAYER=${layerDef.options.layers}`,
+                // With width/height hints
+                `${baseUrl}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetLegendGraphic&FORMAT=image/png&LAYER=${layerDef.options.layers}&WIDTH=20&HEIGHT=20`
+            ];
+            
+            const img = document.createElement('img');
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            img.style.display = 'block';
+            img.style.marginTop = '4px';
+            img.alt = `Legend for ${layerDef.label}`;
+            
+            let currentUrlIndex = 0;
+            
+            const tryNextUrl = () => {
+                if (currentUrlIndex < legendUrls.length) {
+                    img.src = legendUrls[currentUrlIndex];
+                    currentUrlIndex++;
+                } else {
+                    // All URLs failed, show custom legend or fallback
+                    img.remove();
+                    const customLegend = customLegends[layerId];
+                    
+                    if (customLegend && customLegend.items) {
+                        const legendTable = document.createElement('div');
+                        legendTable.style.fontSize = '11px';
+                        legendTable.style.marginTop = '4px';
+                        
+                        customLegend.items.forEach(item => {
+                            const row = document.createElement('div');
+                            row.style.display = 'flex';
+                            row.style.alignItems = 'center';
+                            row.style.marginBottom = '3px';
+                            
+                            const colorBox = document.createElement('div');
+                            colorBox.style.width = '20px';
+                            colorBox.style.height = '12px';
+                            colorBox.style.backgroundColor = item.color;
+                            colorBox.style.border = '1px solid #999';
+                            colorBox.style.marginRight = '6px';
+                            colorBox.style.flexShrink = '0';
+                            
+                            const labelSpan = document.createElement('span');
+                            labelSpan.textContent = item.label;
+                            
+                            row.appendChild(colorBox);
+                            row.appendChild(labelSpan);
+                            legendTable.appendChild(row);
+                        });
+                        
+                        itemDiv.appendChild(legendTable);
+                    } else {
+                        const fallbackMsg = document.createElement('div');
+                        fallbackMsg.style.fontSize = '11px';
+                        fallbackMsg.style.color = '#999';
+                        fallbackMsg.style.fontStyle = 'italic';
+                        fallbackMsg.textContent = 'Legend not available from service';
+                        itemDiv.appendChild(fallbackMsg);
+                    }
+                }
+            };
+            
+            img.onerror = tryNextUrl;
+            img.onload = () => {
+                // Check if image actually loaded (some services return 1x1 transparent pixel)
+                if (img.naturalWidth < 5 || img.naturalHeight < 5) {
+                    tryNextUrl();
+                }
+            };
+            
+            itemDiv.appendChild(img);
+            tryNextUrl();
         } else {
-            // Fallback: generic layer indicator
-            const genericMsg = document.createElement('div');
-            genericMsg.style.fontSize = '11px';
-            genericMsg.style.color = '#666';
-            genericMsg.style.marginTop = '4px';
-            genericMsg.textContent = 'Layer active on map';
-            itemDiv.appendChild(genericMsg);
+            // Non-WMS layer fallback
+            const fallbackMsg = document.createElement('div');
+            fallbackMsg.style.fontSize = '11px';
+            fallbackMsg.style.color = '#666';
+            fallbackMsg.textContent = 'Layer active on map';
+            itemDiv.appendChild(fallbackMsg);
         }
 
         legendContent.appendChild(itemDiv);
