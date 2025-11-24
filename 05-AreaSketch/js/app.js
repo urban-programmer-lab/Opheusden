@@ -558,13 +558,15 @@ async function loadKMZ(url) {
         // Create a Leaflet GeoJSON layer
         const kmzLayer = L.geoJSON(filteredGeoJSON, {
             style: function (feature) {
-                // Style for polygons and lines
+                // Style for polygons and lines - soft border, no fill
                 return {
-                    color: '#FF6B6B',
+                    color: '#b81c0bff',
                     weight: 2,
-                    opacity: 0.8,
-                    fillColor: '#FF6B6B',
-                    fillOpacity: 0.3
+                    opacity: 1,
+                    fillOpacity: 0,
+                    smoothFactor: 1.5,
+                    lineCap: 'round',
+                    lineJoin: 'round'
                 };
             },
             pointToLayer: function (feature, latlng) {
@@ -583,6 +585,28 @@ async function loadKMZ(url) {
                     }
                     if (popupContent) {
                         layer.bindPopup(popupContent);
+                    }
+
+                    // Add permanent label with the number from name or description
+                    if (layer.getBounds && feature.geometry.type.includes('Polygon')) {
+                        // Extract number from name or description
+                        let labelText = '';
+                        if (feature.properties.name) {
+                            // Try to extract number from name
+                            const match = feature.properties.name.match(/\d+/);
+                            labelText = match ? match[0] : feature.properties.name;
+                        }
+
+                        // Create permanent label at polygon center with circular background
+                        const center = layer.getBounds().getCenter();
+                        L.marker(center, {
+                            icon: L.divIcon({
+                                className: 'polygon-label',
+                                html: '<div style="background: white; border: 2px solid #e35f13ff; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #e35f13ff; font-size: 14px;">' + labelText + '</div>',
+                                iconSize: [30, 30],
+                                iconAnchor: [15, 15]
+                            })
+                        }).addTo(map);
                     }
                 }
             }
